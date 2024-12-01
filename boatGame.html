@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper Boat</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #2980b9, #2c3e50);
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z-index: 2;
+        }
+
+        #backgroundOverlay {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            background: url('./images/8.png') center/cover no-repeat;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        #score, #level {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 3;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+            background-color: rgba(44, 62, 80, 0.8);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #score {
+            top: 10px;
+            left: 10px;
+        }
+
+        #level {
+            top: 10px;
+            right: 10px;
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            max-width: 300px;
+            width: 90%;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            text-align: center;
+            z-index: 4; 
+            color: white;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        p {
+            margin: 10px 0;
+            font-size: 20px;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background-color: #27ae60;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #219653;
+        }
+
+        .blast {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: radial-gradient(circle, yellow, red);
+            animation: blastAnimation 0.5s forwards;
+            z-index: 4;
+        }
+
+        @keyframes blastAnimation {
+            from {
+                transform: scale(1);
+                opacity: 1;
+            }
+            to {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        #blurredBackground {
+            position: fixed; 
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: inherit; 
+            filter: blur(5px); 
+            display: none; 
+            z-index: 3; 
+        }
+    </style>
+</head>
+<body>
+
+<audio id="introAudio" autoplay>
+    <source src="./sound/intro.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+</audio>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas"></canvas>
+    <div id="backgroundOverlay"></div>
+    <div id="blurredBackground"></div> 
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p id="finalScore"></p>
+        <button id="restartButton">Restart Game</button>
+    </div>
+</div>
+<div id="score">Score: 0</div>
+<div id="level">Level: 1</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const soundEffectForMovement = new Audio('./sound/movement.mp3');
+    const soundEffectGameOver = new Audio('./sound/gameover.mp3');
+
+    const boatWidth = 227;
+    const boatHeight = 128;
+    let boatX = canvas.width / 2 - boatWidth / 2;
+    const initialBoatY = canvas.height * 0.75 - boatHeight;
+    let boatY = initialBoatY;
+
+    const boatSpeed = 40;
+    const bottleSize = 70;
+    const bottleNaturalWidth = 1920;
+    const bottleNaturalHeight = 1080;
+
+    const bottles = [];
+    const bombs = [];
+    let score = 0;
+    let level = 1;
+    let gameOver = false;
+
+    let imagesLoaded = false;
+    let bombFrequencyIncreaseInterval;
+    let bombSpawnInterval = 700; 
+
+
+    const boatImg = new Image();
+    boatImg.src = './images/ship.png';
+
+    const bombImg = new Image();
+    bombImg.src = './images/bomb.png';
+
+    const introAudio = document.getElementById('introAudio');
+    
+
+    const bottleImages = [];
+    for (let i = 1; i <= 5; i++) {
+        const img = new Image();
+        img.src = `./images/bottle${i}.png`;
+        bottleImages.push(img);
+    }
+
+    let loadedImagesCount = 0;
+    const totalImages = 1 + bottleImages.length;
+
+    function imageLoaded() {
+        loadedImagesCount++;
+        if (loadedImagesCount === totalImages) {
+            imagesLoaded = true;
+            requestAnimationFrame(gameLoop);
+            introAudio.addEventListener('ended', () => {
+                startGame();
+    });
+        }
+    }
+
+    boatImg.onload = imageLoaded;
+    bombImg.onload = imageLoaded;
+    
+    bottleImages.forEach(img => {
+        img.onload = imageLoaded;
+    });
+
+
+    let speed = 4; 
+    const speedIncreaseInterval = 10000; 
+
+    function generateObject() {
+        const type = Math.random() < 0.3 ? 'bomb' : 'bottle';
+        const x = Math.random() * (canvas.width - bottleSize);
+        const glowing = Math.random() < 0.1;
+
+        const obj = { x, y: -bottleSize, size: bottleSize, type, variant: Math.floor(Math.random() * 3), exploded: false, glowing };
+
+        if (type === 'bomb') {
+            bombs.push(obj);
+        } else {
+            bottles.push(obj);
+        }
+    }
+
+    let boatGlow = false;
+    const sinkingDuration = 1000; 
+    const sinkingInterval = 30; 
+    let sinking = false; 
+    function drawBoat() {
+        if (imagesLoaded) {
+            ctx.save();
+            if (boatGlow) {
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = "yellow";
+                ctx.shadowRadius = 40;
+            }
+            ctx.drawImage(boatImg, boatX, boatY, boatWidth, boatHeight);
+            ctx.restore();
+        }
+    }
+
+    function drawObjects() {
+        bottles.forEach((bottle, index) => {
+            if (imagesLoaded) {
+                const adjustedWidth = 136.6;
+                const adjustedHeight = 76.8;
+
+                if (bottle.glowing) {
+                ctx.save();
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = "#FF00FF";
+                ctx.shadowRadius = 200;
+                }
+                
+
+                ctx.drawImage(bottleImages[bottle.variant], bottle.x, bottle.y, adjustedWidth, adjustedHeight);
+                if (bottle.glowing) ctx.restore();
+                bottle.y += speed; 
+
+                const bottleCenterX = bottle.x + adjustedWidth / 2;
+                const bottleCenterY = bottle.y + adjustedHeight / 2;
+
+                if (
+                    bottleCenterX > boatX &&
+                    bottleCenterX < boatX + boatWidth &&
+                    bottleCenterY > boatY &&
+                    bottleCenterY < boatY + boatHeight
+                ) {
+                    soundEffectForMovement.play();
+                    score += bottle.glowing ? 30 : 10;
+                    bottles.splice(index, 1);
+                    toggleGlow();
+                    checkLevelProgression();
+                }
+
+                if (bottle.y > canvas.height) {
+                    bottles.splice(index, 1);
+                }
+            }
+        });
+
+        bombs.forEach((bomb, index) => {
+        if (imagesLoaded && !bomb.exploded) {
+            const bombWidth = 136.6; 
+            const bombHeight = 76.8;
+
+            ctx.drawImage(bombImg, bomb.x, bomb.y, bombWidth, bombHeight);
+            bomb.y += speed;
+            
+            const bombCenterX = bomb.x + bombWidth / 2;
+            const bombCenterY = bomb.y + bombHeight / 2;
+
+            if (
+                bombCenterX > boatX &&
+                bombCenterX < boatX + boatWidth &&
+                bombCenterY > boatY &&
+                bombCenterY < boatY + boatHeight
+            ) {
+                bomb.exploded = true;
+                bombs.splice(index, 1);
+                createBlast(bombCenterX, bombCenterY); 
+                sinkBoat();
+            }
+        }
+        });
+    }
+
+    function createBlast(x, y) {
+        const blast = document.createElement("div");
+        blast.classList.add("blast");
+        blast.style.left = `${x - 25}px`;
+        blast.style.top = `${y - 25}px`;
+        document.body.appendChild(blast);
+
+        setTimeout(() => {
+            blast.remove();
+        }, 500);
+    }
+
+    function sinkBoat() {
+        soundEffectGameOver.play();
+        if (!sinking) {
+            sinking = true;
+            const sinkStartY = boatY;
+            const sinkEndY = canvas.height; 
+            const sinkDistance = sinkEndY - sinkStartY;
+            const sinkingSteps = sinkingDuration / sinkingInterval;
+            let currentStep = 0;
+
+            const sinkAnimation = setInterval(() => {
+                if (currentStep < sinkingSteps) {
+                    boatY += sinkDistance / sinkingSteps;
+                    currentStep++;
+                } else {
+                    clearInterval(sinkAnimation);
+                    gameOver = true; 
+                    document.getElementById('finalScore').innerText = `Your score: ${score}`;
+                    document.getElementById('gameOver').style.display = 'block';
+
+                }
+            }, sinkingInterval);
+        }
+    }
+
+    let isGlowInProgress = false;
+
+    function toggleGlow() {
+        if (!isGlowInProgress) {
+        boatGlow = !boatGlow; 
+        isGlowInProgress = true; 
+
+        setTimeout(() => {
+            boatGlow = !boatGlow; 
+            isGlowInProgress = false; 
+        }, 500); 
+    }
+    }
+
+    function checkLevelProgression() {
+        if (score >= level * 100) {
+            level++;
+            speed += 1; 
+            bombSpawnInterval = Math.max(100, bombSpawnInterval - 50); 
+            clearInterval(bombFrequencyIncreaseInterval);
+            bombFrequencyIncreaseInterval = setInterval(generateObject, bombSpawnInterval);
+        }
+        document.getElementById('level').innerText = `Level: ${level}`;
+    }
+
+    function startGame() {
+        clearInterval(bombFrequencyIncreaseInterval);
+        bombFrequencyIncreaseInterval = setInterval(generateObject, bombSpawnInterval);
+        setInterval(() => {
+            if (!gameOver) {
+                speed += 0.1; 
+            }
+        }, speedIncreaseInterval);
+    }
+
+    function gameLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!gameOver) {
+            drawObjects();
+            drawBoat();
+            document.getElementById('score').innerText = `Score: ${score}`;
+            requestAnimationFrame(gameLoop);
+        }
+    }
+
+    document.addEventListener('keydown', (event) => {
+        if (!gameOver) {
+            if (event.key === 'ArrowLeft' && boatX > 0) {
+                boatX -= boatSpeed;
+            } else if (event.key === 'ArrowRight' && boatX < canvas.width - boatWidth) {
+                boatX += boatSpeed;
+            }
+        }
+    });
+
+    document.getElementById('restartButton').addEventListener('click', () => {
+        document.getElementById('gameOver').style.display = 'none';
+        document.getElementById('blurredBackground').style.display = 'none'; 
+        score = 0;
+        level = 1;
+        speed = 4;
+        bombSpawnInterval = 700;
+        bottles.length = 0;
+        bombs.length = 0;
+        boatY = initialBoatY;
+        gameOver = false;
+        boatGlow = false;
+        sinking = false; 
+        boatX = canvas.width / 2 - boatWidth / 2;
+        boatY = canvas.height * 0.75 - boatHeight;
+        document.getElementById('score').innerText = `Score: ${score}`;
+        document.getElementById('level').innerText = `Level: ${level}`;
+        clearInterval(bombFrequencyIncreaseInterval);
+        requestAnimationFrame(gameLoop);
+        startGame();
+    });
+</script>
+
+</body>
+</html>

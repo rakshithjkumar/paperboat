@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paper Boat</title>
+  <style>
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #000;
+      background-image: none;
+      background-size: cover;
+      background-position: center;
+    }
+
+    video {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+
+
+    #redirectButton {
+      display: none;
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 15px 30px;
+      font-size: 22px;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      color: #fff;
+      background-color: #004aad;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+      animation: pulse 1.5s infinite;
+    }
+
+    #redirectButton:hover {
+      background-color: #218838;
+      transform: scale(1.1) translate(-50%, -50%);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1) translate(-50%, -50%);
+      }
+      50% {
+        transform: scale(1.05) translate(-50%, -50%);
+      }
+    }
+
+   
+    #skipButton {
+      display: none;
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      color: #fff;
+      background-color: rgba(0, 0, 0, 0.6);
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    #skipButton:hover {
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+  </style>
+</head>
+<body>
+
+  <audio id="introAudio" autoplay loop>
+    <source src="./sound/contextaudio.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+
+  <video id="myVideo" width="1366" height="768" autoplay muted>
+    <source src="./images/intro.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+
+  <button id="redirectButton" onclick="window.location.href='boatGame.html'">Start Game</button>
+  <button id="skipButton" onclick="skipVideo()">Skip Intro</button>
+
+  <script>
+
+    document.getElementById('myVideo').addEventListener('ended', function() {
+      document.getElementById('redirectButton').style.display = 'block';
+      document.getElementById('skipButton').style.display = 'none';
+      this.pause();
+    });
+
+    function skipVideo() {
+      document.getElementById('myVideo').pause();
+      document.getElementById('myVideo').style.display = 'none';
+      document.getElementById('redirectButton').style.display = 'block';
+      document.getElementById('skipButton').style.display = 'none';
+      document.body.style.backgroundImage = "url('./images/8.png')"; 
+    }
+
+    setTimeout(() => {
+      document.getElementById('skipButton').style.display = 'block';
+    }, 3000);
+  </script>
+
+</body>
+</html>
